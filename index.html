@@ -404,6 +404,19 @@
 
         signInAnonymously(auth).catch((error) => {
             console.error("Auth error:", error);
+            const statusEl = document.getElementById('connectionStatus');
+            
+            if (window.location.protocol === 'file:') {
+                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-yellow-500"></span> Local Mode`;
+                statusEl.classList.remove('text-slate-400');
+                statusEl.classList.add('text-yellow-600', 'bg-yellow-50', 'border-yellow-100');
+                showToast("Running from computer file. Upload to GitHub to enable cloud saving!");
+            } else {
+                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-red-500"></span> Blocked`;
+                statusEl.classList.remove('text-slate-400');
+                statusEl.classList.add('text-red-600', 'bg-red-50', 'border-red-100');
+                showToast("Firebase connection blocked! Make sure this domain is added to Firebase's 'Authorized Domains'.");
+            }
         });
 
         onAuthStateChanged(auth, (user) => {
@@ -889,13 +902,3 @@
             closeModal();
             showToast("Moved to next phase.");
         }
-
-        function showToast(msg) {
-            const t = document.getElementById('toast');
-            document.getElementById('toastMsg').innerText = msg;
-            t.classList.remove('translate-y-32', 'opacity-0');
-            setTimeout(() => t.classList.add('translate-y-32', 'opacity-0'), 2500);
-        }
-    </script>
-</body>
-</html>
