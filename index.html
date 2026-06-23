@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAT Study Tracker 2.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(229, 231, 235, 1);
+        }
+        .modal-backdrop {
+            background-color: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(6px);
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        @keyframes pulse-border {
+            0% { border-color: rgba(99, 102, 241, 0.4); }
+            50% { border-color: rgba(99, 102, 241, 1); }
+            100% { border-color: rgba(99, 102, 241, 0.4); }
+        }
+        .paste-active { animation: pulse-border 2s infinite; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen p-4 md:p-8 text-slate-900">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-6">
+            <div>
+                <h1 class="text-3xl font-bold tracking-tight text-indigo-950">SAT Study Tracker <span class="text-indigo-500">2.0</span></h1>
+                <p class="text-slate-500">Visual active recall & mistake tracking system.</p>
+            </div>
+            <div class="flex gap-3 items-center">
+                 <div id="connectionStatus" class="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1 bg-white px-3 py-1 rounded-full border border-slate-200 h-8 mt-1 shadow-sm">
+                    <span class="w-2 h-2 rounded-full bg-slate-300"></span> Connecting...
+                </div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- Input Form & Stats Section -->
+            <div class="lg:col-span-4 space-y-6">
+                <!-- Stats Card -->
+                <div class="glass-card p-6 rounded-2xl shadow-sm border-indigo-50 bg-gradient-to-br from-white to-slate-50">
+                    <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Active Problems</h3>
+                    <div class="flex items-baseline gap-2">
+                        <span id="totalMistakes" class="text-4xl font-black text-slate-800 tracking-tight">0</span>
+                        <span class="text-sm font-medium text-slate-500">in review queue</span>
+                    </div>
+                </div>
+
+                <!-- Input Form -->
+                <div class="glass-card p-6 rounded-2xl shadow-lg border-indigo-50 sticky top-8">
+                    <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-600"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        Add New Problem
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <!-- Subject Toggle -->
+                        <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+                            <button onclick="setAddSubject('Math')" id="btnMath" class="py-2 text-xs font-bold rounded-lg transition-all bg-white shadow-sm text-indigo-600">MATH</button>
+                            <button onclick="setAddSubject('Reading')" id="btnReading" class="py-2 text-xs font-bold rounded-lg transition-all text-slate-500 hover:text-slate-700">READING</button>
+                        </div>
+                        <input type="hidden" id="qSubject" value="Math">
+
+                        <!-- Meta Info Row -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Question ID</label>
+                                <input type="text" id="qId" placeholder="e.g. 96f3accc" class="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition bg-white text-sm font-mono">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Correct Answer</label>
+                                <input type="text" id="qAnswer" placeholder="e.g. A, 42" class="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition bg-white text-sm font-bold text-indigo-700">
+                            </div>
+                        </div>
+
+                        <!-- Source & Type Row -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Source / Page</label>
+                                <input type="text" id="qSource" placeholder="e.g. Test 1, Pg 45" class="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Problem Type</label>
+                                <select id="qType" class="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition bg-white text-sm appearance-none">
+                                    <option value="" disabled selected>Select Problem Type</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Image Paste Area -->
+                        <div class="mt-2">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Problem Screenshot</label>
+                            <div id="pasteZone" class="w-full border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 flex flex-col items-center justify-center text-center transition-all overflow-hidden relative group" style="min-h: 120px;">
+                                <div id="pastePlaceholder" class="p-6 pointer-events-none">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-slate-400 mb-2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                                    <p class="text-xs text-slate-500 font-medium">Click anywhere and press <br><strong class="text-indigo-500">Ctrl+V</strong> or <strong class="text-indigo-500">Cmd+V</strong> to paste screenshot</p>
+                                </div>
+                                
+                                <div id="imagePreviewContainer" class="hidden w-full relative">
+                                    <img id="imagePreview" src="" class="w-full object-contain bg-white" style="max-height: 250px;">
+                                    <button onclick="clearImage()" class="absolute top-2 right-2 bg-slate-900/80 text-white p-1.5 rounded-full hover:bg-red-500 transition-colors backdrop-blur-sm">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mistake Reason -->
+                        <div>
+                            <label class="block text-[10px] font-bold text-red-400 uppercase mb-1 ml-1">Why did I make this mistake?</label>
+                            <textarea id="qMistake" rows="2" placeholder="(Hidden during review) e.g. Forgot to distribute the negative sign..." class="w-full px-4 py-3 rounded-xl border border-red-100 bg-red-50/30 focus:ring-4 focus:ring-red-500/10 focus:border-red-300 outline-none transition text-sm leading-relaxed"></textarea>
+                        </div>
+
+                        <button id="addBtn" class="w-full bg-slate-900 hover:bg-indigo-600 text-white py-3.5 rounded-xl font-bold transition-all mt-4 shadow-lg flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                            Add to Study Queue
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content Area (Tabs) -->
+            <div class="lg:col-span-8 flex flex-col">
+                
+                <!-- Navigation Tabs -->
+                <div class="flex gap-6 mb-4 border-b border-slate-200 px-2 overflow-x-auto no-scrollbar">
+                    <button onclick="switchTab('study')" id="navStudy" class="pb-3 text-sm font-bold border-b-2 border-indigo-600 text-indigo-600 transition-all whitespace-nowrap">Study Queue</button>
+                    <button onclick="switchTab('analytics')" id="navAnalytics" class="pb-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition-all whitespace-nowrap">Analytics</button>
+                    <button onclick="switchTab('directory')" id="navDirectory" class="pb-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition-all whitespace-nowrap">All IDs</button>
+                </div>
+
+                <!-- 1. Study View -->
+                <div id="studyView" class="flex glass-card rounded-2xl shadow-lg border-indigo-50 overflow-hidden min-h-[700px] flex-col flex-grow">
+                    
+                    <!-- Phase Tabs (Levels) -->
+                    <div class="flex border-b border-slate-200 bg-slate-50/50 overflow-x-auto">
+                        <button onclick="setPhase(1)" id="tabPhase1" class="flex-1 min-w-[100px] py-4 text-xs font-bold tracking-wider text-indigo-600 border-b-2 border-indigo-600 bg-white transition-colors">
+                            PHASE 1<br><span class="text-[9px] font-normal opacity-70">1x Wrong</span>
+                        </button>
+                        <button onclick="setPhase(2)" id="tabPhase2" class="flex-1 min-w-[100px] py-4 text-xs font-bold tracking-wider text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition-colors">
+                            PHASE 2<br><span class="text-[9px] font-normal opacity-70">2x Wrong</span>
+                        </button>
+                        <button onclick="setPhase(3)" id="tabPhase3" class="flex-1 min-w-[100px] py-4 text-xs font-bold tracking-wider text-slate-400 border-b-2 border-transparent hover:text-slate-600 transition-colors">
+                            PHASE 3+<br><span class="text-[9px] font-normal opacity-70">Critical</span>
+                        </button>
+                        <button onclick="setPhase(0)" id="tabPhase0" class="flex-1 min-w-[100px] py-4 text-xs font-bold tracking-wider text-green-600/60 border-b-2 border-transparent hover:text-green-600 transition-colors">
+                            MASTERED<br><span class="text-[9px] font-normal opacity-70">Done</span>
+                        </button>
+                    </div>
+
+                    <!-- Subject Filters (Secondary) -->
+                    <div class="px-4 py-3 bg-white border-b border-slate-100 flex gap-2 overflow-x-auto">
+                        <button onclick="setSubjectFilter('All')" id="filAll" class="px-4 py-1.5 text-[11px] font-bold rounded-full bg-slate-800 text-white transition-all shadow-md">All Subjects</button>
+                        <button onclick="setSubjectFilter('Math')" id="filMath" class="px-4 py-1.5 text-[11px] font-bold rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all">Math</button>
+                        <button onclick="setSubjectFilter('Reading')" id="filReading" class="px-4 py-1.5 text-[11px] font-bold rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all">Reading</button>
+                    </div>
+                    
+                    <!-- Questions List -->
+                    <div id="listContainer" class="flex-grow overflow-y-auto p-4 md:p-6 space-y-4 bg-slate-50/50">
+                        <div class="text-center py-20 opacity-50 font-medium">Loading questions...</div>
+                    </div>
+                </div>
+
+                <!-- 2. Analytics View -->
+                <div id="analyticsView" class="hidden glass-card rounded-2xl shadow-lg border-indigo-50 p-6 md:p-8 min-h-[700px] flex-col items-center">
+                    <h2 class="text-xl font-bold text-slate-800 mb-2">Mistake Breakdown</h2>
+                    <p class="text-sm text-slate-500 mb-8 text-center">Percentage of problem types among all your logged mistakes.</p>
+                    <div class="w-full grid grid-cols-1 md:grid-cols-2 gap-8 flex-grow">
+                        <!-- Math Chart -->
+                        <div class="flex flex-col items-center w-full">
+                            <h3 class="text-sm font-bold text-indigo-600 mb-4 bg-indigo-50 px-4 py-1.5 rounded-full border border-indigo-100 shadow-sm">Math</h3>
+                            <div class="w-full flex-grow relative flex items-center justify-center min-h-[300px]">
+                                <canvas id="mathMistakesChart"></canvas>
+                                <div id="mathNoData" class="hidden text-slate-400 text-sm flex-col items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-50"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                                    No Math mistakes logged yet.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Reading Chart -->
+                        <div class="flex flex-col items-center w-full">
+                            <h3 class="text-sm font-bold text-orange-600 mb-4 bg-orange-50 px-4 py-1.5 rounded-full border border-orange-100 shadow-sm">Reading</h3>
+                            <div class="w-full flex-grow relative flex items-center justify-center min-h-[300px]">
+                                <canvas id="readingMistakesChart"></canvas>
+                                <div id="readingNoData" class="hidden text-slate-400 text-sm flex-col items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-50"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                                    No Reading mistakes logged yet.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Directory View -->
+                <div id="directoryView" class="hidden glass-card rounded-2xl shadow-lg border-indigo-50 p-6 md:p-8 min-h-[700px] flex-col">
+                    <h2 class="text-xl font-bold text-slate-800 mb-2">Problem Directory</h2>
+                    <p class="text-sm text-slate-500 mb-8">All your tracked problem IDs separated by subject. Click any ID to review it immediately.</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full flex-grow">
+                        <!-- Math IDs -->
+                        <div class="flex flex-col h-full">
+                            <h3 class="text-sm font-bold text-indigo-700 mb-4 bg-indigo-50 px-4 py-2.5 rounded-xl border border-indigo-100 flex justify-between items-center shadow-sm">
+                                <span class="flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+                                    Math
+                                </span>
+                                <span id="mathCount" class="bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded font-mono text-[11px]">0</span>
+                            </h3>
+                            <div id="mathDirectoryList" class="flex flex-wrap gap-2 content-start p-2 bg-slate-50 rounded-xl border border-slate-100 flex-grow">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+
+                        <!-- Reading IDs -->
+                        <div class="flex flex-col h-full">
+                            <h3 class="text-sm font-bold text-orange-700 mb-4 bg-orange-50 px-4 py-2.5 rounded-xl border border-orange-100 flex justify-between items-center shadow-sm">
+                                <span class="flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+                                    Reading
+                                </span>
+                                <span id="readingCount" class="bg-orange-200 text-orange-800 px-2 py-0.5 rounded font-mono text-[11px]">0</span>
+                            </h3>
+                            <div id="readingDirectoryList" class="flex flex-wrap gap-2 content-start p-2 bg-slate-50 rounded-xl border border-slate-100 flex-grow">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Delete Confirmation Modal (Replaces standard 'confirm') -->
+    <div id="deleteModal" class="fixed inset-0 modal-backdrop hidden z-[70] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 md:p-8 max-w-sm w-full text-center shadow-2xl transform transition-all">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-600"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+            </div>
+            <h3 class="text-xl font-bold text-slate-800 mb-2">Delete Problem?</h3>
+            <p class="text-sm text-slate-500 mb-8">This action cannot be undone. This will permanently remove the problem and its screenshot from your queue.</p>
+            <div class="flex gap-3">
+                <button onclick="cancelDelete()" class="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors">Cancel</button>
+                <button onclick="confirmDelete()" class="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 shadow-lg shadow-red-200 transition-colors">Yes, Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Study Modal -->
+    <div id="studyModal" class="fixed inset-0 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden transform transition-all scale-100">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-white shadow-sm z-10">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <span id="modalSubject" class="text-[10px] font-bold uppercase tracking-widest text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-100">Math</span>
+                    <div class="h-4 w-px bg-slate-200 hidden sm:block"></div>
+                    <span class="text-xs font-medium text-slate-500 flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                        <span id="modalSource">Test 1</span>
+                    </span>
+                    <span class="text-xs font-medium text-slate-500 flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                        <span id="modalType">Algebra</span>
+                    </span>
+                    <div class="h-4 w-px bg-slate-200 hidden sm:block"></div>
+                    <span class="font-mono text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">ID: <span id="modalId">12345</span></span>
+                </div>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-red-500 p-2 bg-slate-50 hover:bg-red-50 rounded-full transition-colors ml-4 flex-shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-6 md:p-8 overflow-y-auto no-scrollbar flex-grow bg-slate-50/50">
+                <!-- Problem Screenshot -->
+                <div class="w-full flex justify-center bg-white border border-slate-200 rounded-xl p-4 shadow-sm min-h-[200px]">
+                    <img id="modalImage" src="" alt="Problem Screenshot" class="max-w-full max-h-[50vh] object-contain rounded">
+                </div>
+                
+                <div class="mt-8">
+                    <!-- Pre-Reveal CTA -->
+                    <div id="answerCover" class="text-center py-10 bg-white rounded-xl border-2 border-dashed border-slate-300 shadow-sm cursor-pointer hover:bg-indigo-50 hover:border-indigo-300 transition-all group" onclick="revealAnswer()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-slate-400 group-hover:text-indigo-500 mb-3 transition-colors"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        <p class="text-base font-bold text-slate-600 group-hover:text-indigo-700">Click to Reveal Answer & Review</p>
+                    </div>
+                    
+                    <!-- Post-Reveal Details -->
+                    <div id="answerReveal" class="hidden animate-fade-in-up space-y-6">
+                        
+                        <!-- Answer Reveal Box -->
+                        <div class="bg-white border border-slate-200 rounded-xl p-6 text-center shadow-sm">
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Correct Answer</p>
+                            <div id="modalAnswer" class="text-4xl font-black text-indigo-600 mb-2"></div>
+                        </div>
+
+                        <!-- Mistake Reason Dropdown -->
+                        <div class="bg-white border border-red-100 rounded-xl overflow-hidden shadow-sm">
+                            <button onclick="toggleMistake()" class="w-full px-6 py-4 flex items-center justify-between bg-red-50 hover:bg-red-100/50 transition-colors">
+                                <div class="flex items-center gap-2 text-red-600">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                                    <span class="font-bold text-sm">Review Mistake Notes</span>
+                                </div>
+                                <svg id="mistakeIcon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-400 transition-transform"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                            </button>
+                            <div id="mistakeContent" class="hidden px-6 py-5 border-t border-red-100 text-sm text-slate-700 leading-relaxed bg-white whitespace-pre-wrap">
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+                            <button onclick="markIncorrectAgain()" class="py-4 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-sm hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-all flex flex-col items-center justify-center group">
+                                <span class="flex items-center gap-2 group-hover:text-red-500 transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+                                    Missed it again
+                                </span>
+                                <span class="text-[10px] text-slate-400 font-normal mt-1">Move to Next Phase</span>
+                            </button>
+                            <button onclick="markMastered()" class="py-4 rounded-xl border border-transparent bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex flex-col items-center justify-center">
+                                <span class="flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    I got it right
+                                </span>
+                                <span class="text-[10px] text-indigo-200 font-normal mt-1">Move to Mastered</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl transform translate-y-32 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-3 z-[100]">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-400"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        <span id="toastMsg" class="font-medium text-sm">Action completed!</span>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDG_y795DXuvHmqqAg09TxUkYPhHewqa1c",
+            authDomain: "sat-mistake-tracker-elu.firebaseapp.com",
+            projectId: "sat-mistake-tracker-elu",
+            storageBucket: "sat-mistake-tracker-elu.firebasestorage.app",
+            messagingSenderId: "952650984444",
+            appId: "1:952650984444:web:8abc3f689e81152c142079",
+            measurementId: "G-6TH9JVBZ74"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = 'sat-mistake-tracker-elu';
+
+        let currentUser = null;
+        let allQuestions = [];
+        let currentPhase = 1;
+        let currentSubjectFilter = 'All';
+        let currentReviewId = null;
+        
+        // Modal State Variables
+        let currentPastedImageBase64 = null;
+        let mathChartInstance = null;
+        let readingChartInstance = null;
+        let deleteTargetId = null;
+
+        const problemTypes = {
+            Math: [
+                "Linear equations in one variable", "Linear functions", "Linear equations in two variables", 
+                "Systems of two linear equations in two variables", "Linear inequalities in one or two variables", 
+                "Nonlinear functions", "Nonlinear equations in one variable and systems of equations in two variables", 
+                "Equivalent expressions", "Ratios, rates, proportional relationships, and units", "Percentages", 
+                "One-variable data: Distributions and measures of center and spread", "Two-variable data: Models and scatterplots", 
+                "Probability and conditional probability", "Inference from sample statistics and margin of error", 
+                "Evaluating statistical claims: Observational studies and experiments", "Area and volume", 
+                "Lines, angles, and triangles", "Right triangles and trigonometry", "Circles"
+            ],
+            Reading: [
+                "Central Ideas and Details", "Inferences", "Command of Evidence", "Words in Context", 
+                "Text Structure and Purpose", "Cross-Text Connections", "Rhetorical Synthesis", "Transitions", 
+                "Boundaries", "Form, Structure, and Sense"
+            ]
+        };
+
+        function updateTypeDropdown(subj) {
+            const select = document.getElementById('qType');
+            select.innerHTML = '<option value="" disabled selected>Select Problem Type</option>';
+            problemTypes[subj].forEach(type => {
+                select.innerHTML += `<option value="${type}">${type}</option>`;
+            });
+        }
+
+        signInAnonymously(auth).catch((error) => {
+            console.error("Auth error:", error);
+        });
+
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            const statusEl = document.getElementById('connectionStatus');
+            if (user) {
+                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500"></span> Online`;
+                statusEl.classList.add('text-green-600', 'bg-green-50', 'border-green-100');
+                setupListener(user.uid);
+            }
+        });
+
+        function setupListener(userId) {
+            const qRef = collection(db, 'artifacts', appId, 'users', userId, 'sat_study_tracker_v2');
+            
+            onSnapshot(qRef, (snapshot) => {
+                const loaded = [];
+                snapshot.forEach(doc => loaded.push({ _id: doc.id, ...doc.data() }));
+                loaded.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                
+                allQuestions = loaded;
+                
+                updateStats();
+                renderList();
+                renderDirectory(); // Update third tab when data changes
+            }, (error) => {
+                console.error("Firestore Error:", error);
+            });
+        }
+
+        function updateStats() {
+            const activeCount = allQuestions.filter(q => q.attempts !== "Mastered").length;
+            const el = document.getElementById('totalMistakes');
+            if(el) el.innerText = activeCount;
+        }
+
+        function getPhaseLevel(attemptsStr) {
+            if (!attemptsStr || attemptsStr === "1st Time Wrong") return 1;
+            if (attemptsStr === "Mastered") return 0;
+            if (attemptsStr.includes("2nd")) return 2;
+            return 3;
+        }
+
+        // --- TAB NAVIGATION ---
+        window.switchTab = function(tab) {
+            const tabs = ['study', 'analytics', 'directory'];
+            
+            tabs.forEach(t => {
+                const navBtn = document.getElementById('nav' + t.charAt(0).toUpperCase() + t.slice(1));
+                const viewDiv = document.getElementById(t + 'View');
+                
+                if (t === tab) {
+                    navBtn.className = "pb-3 text-sm font-bold border-b-2 border-indigo-600 text-indigo-600 transition-all whitespace-nowrap";
+                    viewDiv.classList.remove('hidden');
+                    viewDiv.classList.add('flex');
+                } else {
+                    navBtn.className = "pb-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition-all whitespace-nowrap";
+                    viewDiv.classList.add('hidden');
+                    viewDiv.classList.remove('flex');
+                }
+            });
+
+            if (tab === 'analytics') renderChart();
+            if (tab === 'directory') renderDirectory();
+        }
+
+        // --- DIRECTORY RENDER ---
+        function renderDirectory() {
+            const mathList = document.getElementById('mathDirectoryList');
+            const readingList = document.getElementById('readingDirectoryList');
+            
+            const mathQs = allQuestions.filter(q => q.subject === 'Math');
+            const readingQs = allQuestions.filter(q => q.subject === 'Reading');
+            
+            document.getElementById('mathCount').innerText = mathQs.length;
+            document.getElementById('readingCount').innerText = readingQs.length;
+            
+            const createBtn = (q) => `
+                <button onclick="openReview('${q._id}')" class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-600 hover:border-indigo-400 hover:text-indigo-700 hover:shadow-sm transition-all cursor-pointer">
+                    ${q.id}
+                </button>
+            `;
+            
+            mathList.innerHTML = mathQs.length > 0 
+                ? mathQs.map(createBtn).join('') 
+                : `<span class="text-xs text-slate-400 p-2 italic">No Math IDs saved.</span>`;
+                
+            readingList.innerHTML = readingQs.length > 0 
+                ? readingQs.map(createBtn).join('') 
+                : `<span class="text-xs text-slate-400 p-2 italic">No Reading IDs saved.</span>`;
+        }
+
+
+        // --- STUDY LIST FILTERING ---
+        window.setPhase = function(phase) {
+            currentPhase = phase;
+            [1, 2, 3, 0].forEach(p => {
+                const btn = document.getElementById(`tabPhase${p}`);
+                if (p === phase) {
+                    btn.classList.add('text-indigo-600', 'border-indigo-600', 'bg-white');
+                    btn.classList.remove('text-slate-400', 'border-transparent');
+                } else {
+                    btn.classList.remove('text-indigo-600', 'border-indigo-600', 'bg-white');
+                    btn.classList.add('text-slate-400', 'border-transparent');
+                }
+            });
+            renderList();
+        }
+
+        window.setSubjectFilter = function(subject) {
+            currentSubjectFilter = subject;
+            ['All', 'Math', 'Reading'].forEach(s => {
+                const btn = document.getElementById(`fil${s}`);
+                btn.className = s === subject ? 
+                    "px-4 py-1.5 text-[11px] font-bold rounded-full bg-slate-800 text-white transition-all shadow-md" : 
+                    "px-4 py-1.5 text-[11px] font-bold rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all";
+            });
+            renderList();
+        }
+
+        function renderList() {
+            const listEl = document.getElementById('listContainer');
+            const filtered = allQuestions.filter(q => {
+                const qPhase = getPhaseLevel(q.attempts);
+                const phaseMatch = (currentPhase === 3) ? qPhase >= 3 : qPhase === currentPhase;
+                const subjectMatch = currentSubjectFilter === 'All' || q.subject === currentSubjectFilter;
+                return phaseMatch && subjectMatch;
+            });
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = `
+                    <div class="text-center py-20 opacity-40">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-4"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                        <p class="font-medium text-sm">No questions in this view.</p>
+                    </div>`;
+                return;
+            }
+
+            listEl.innerHTML = filtered.map(q => `
+                <div class="group bg-white rounded-xl p-4 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center gap-4 shadow-sm hover:border-indigo-300 hover:shadow-md transition-all">
+                    
+                    <!-- Thumbnail -->
+                    <div class="w-full sm:w-24 h-24 flex-shrink-0 bg-slate-50 border border-slate-100 rounded-lg overflow-hidden flex justify-center items-center">
+                        ${q.imageBase64 ? 
+                            `<img src="${q.imageBase64}" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity">` : 
+                            `<span class="text-[10px] text-slate-400">No Image</span>`
+                        }
+                    </div>
+
+                    <!-- Info -->
+                    <div class="flex-grow w-full">
+                        <div class="flex items-center gap-2 mb-2 flex-wrap">
+                            <span class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${q.subject === 'Math' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-orange-50 text-orange-600 border-orange-100'}">${q.subject}</span>
+                            ${q.source ? `<span class="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>${q.source}</span>` : ''}
+                            ${q.problemType ? `<span class="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>${q.problemType}</span>` : ''}
+                            <span class="font-mono text-[10px] text-slate-300 ml-auto block">#${q.id}</span>
+                        </div>
+                        <p class="text-xs text-slate-600 line-clamp-2 italic">${q.mistakeReason ? `Notes: "${q.mistakeReason}"` : 'No mistake notes added.'}</p>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                        <button onclick="openReview('${q._id}')" class="flex-grow sm:flex-grow-0 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white px-5 py-2.5 rounded-lg text-xs font-bold transition-colors shadow-sm">Review</button>
+                        <button onclick="deleteItem('${q._id}')" class="text-slate-400 hover:text-red-500 p-2 bg-slate-50 hover:bg-red-50 rounded-lg transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- SAFE TRASH DELETION LOGIC ---
+        window.deleteItem = (id) => {
+            deleteTargetId = id;
+            document.getElementById('deleteModal').classList.remove('hidden');
+        }
+
+        window.cancelDelete = () => {
+            deleteTargetId = null;
+            document.getElementById('deleteModal').classList.add('hidden');
+        }
+
+        window.confirmDelete = async () => {
+            if(deleteTargetId && currentUser) {
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'sat_study_tracker_v2', deleteTargetId));
+                    showToast("Problem deleted.");
+                } catch (e) {
+                    console.error("Deletion failed:", e);
+                    alert("Error deleting item.");
+                }
+            }
+            cancelDelete();
+        }
+
+        // --- CHARTS LOGIC ---
+        function renderChart() {
+            const mathCtx = document.getElementById('mathMistakesChart').getContext('2d');
+            const readingCtx = document.getElementById('readingMistakesChart').getContext('2d');
+            
+            const mathCounts = {};
+            const readingCounts = {};
+
+            allQuestions.forEach(q => {
+                if (q.problemType) {
+                    if (q.subject === 'Math') {
+                        mathCounts[q.problemType] = (mathCounts[q.problemType] || 0) + 1;
+                    } else if (q.subject === 'Reading') {
+                        readingCounts[q.problemType] = (readingCounts[q.problemType] || 0) + 1;
+                    }
+                }
+            });
+
+            if (mathChartInstance) mathChartInstance.destroy();
+            if (readingChartInstance) readingChartInstance.destroy();
+
+            const colors = [
+                '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', 
+                '#f59e0b', '#84cc16', '#10b981', '#06b6d4', '#0ea5e9',
+                '#3b82f6', '#d946ef', '#e11d48', '#ea580c', '#14b8a6',
+                '#a855f7', '#fb7185', '#fb923c', '#facc15'
+            ];
+
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { 
+                        position: 'bottom',
+                        labels: { font: { family: 'Inter' }, boxWidth: 10, padding: 15 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) label += ': ';
+                                let total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                let value = context.raw;
+                                let percentage = Math.round((value / total) * 100) + '%';
+                                label += value + ' mistakes (' + percentage + ')';
+                                return label;
+                            }
+                        }
+                    }
+                }
+            };
+
+            // Render Math Chart
+            const mathLabels = Object.keys(mathCounts);
+            const mathData = Object.values(mathCounts);
+            if (mathLabels.length > 0) {
+                document.getElementById('mathMistakesChart').style.display = 'block';
+                document.getElementById('mathNoData').style.display = 'none';
+                mathChartInstance = new Chart(mathCtx, {
+                    type: 'pie',
+                    data: { labels: mathLabels, datasets: [{ data: mathData, backgroundColor: colors, borderWidth: 2, borderColor: '#ffffff' }] },
+                    options: chartOptions
+                });
+            } else {
+                document.getElementById('mathMistakesChart').style.display = 'none';
+                document.getElementById('mathNoData').style.display = 'flex';
+            }
+
+            // Render Reading Chart
+            const readingLabels = Object.keys(readingCounts);
+            const readingData = Object.values(readingCounts);
+            if (readingLabels.length > 0) {
+                document.getElementById('readingMistakesChart').style.display = 'block';
+                document.getElementById('readingNoData').style.display = 'none';
+                readingChartInstance = new Chart(readingCtx, {
+                    type: 'pie',
+                    data: { labels: readingLabels, datasets: [{ data: readingData, backgroundColor: colors, borderWidth: 2, borderColor: '#ffffff' }] },
+                    options: chartOptions
+                });
+            } else {
+                document.getElementById('readingMistakesChart').style.display = 'none';
+                document.getElementById('readingNoData').style.display = 'flex';
+            }
+        }
+
+
+        // --- IMAGE PASTE HANDLING ---
+        document.addEventListener('paste', function(e) {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let index in items) {
+                const item = items[index];
+                if (item.kind === 'file' && item.type.startsWith('image/')) {
+                    e.preventDefault(); 
+                    const blob = item.getAsFile();
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(event) {
+                        const img = new Image();
+                        img.onload = function() {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            
+                            const MAX_WIDTH = 1200;
+                            const MAX_HEIGHT = 1200;
+                            let width = img.width;
+                            let height = img.height;
+
+                            if (width > height) {
+                                if (width > MAX_WIDTH) {
+                                    height *= MAX_WIDTH / width;
+                                    width = MAX_WIDTH;
+                                }
+                            } else {
+                                if (height > MAX_HEIGHT) {
+                                    width *= MAX_HEIGHT / height;
+                                    height = MAX_HEIGHT;
+                                }
+                            }
+                            
+                            canvas.width = width;
+                            canvas.height = height;
+                            
+                            ctx.fillStyle = "white";
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                            ctx.drawImage(img, 0, 0, width, height);
+                            
+                            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                            
+                            currentPastedImageBase64 = compressedBase64;
+                            document.getElementById('imagePreview').src = compressedBase64;
+                            document.getElementById('imagePreviewContainer').classList.remove('hidden');
+                            document.getElementById('pastePlaceholder').classList.add('hidden');
+                            document.getElementById('pasteZone').classList.add('border-indigo-400', 'bg-indigo-50/30');
+                        };
+                        img.src = event.target.result;
+                    };
+                    reader.readAsDataURL(blob);
+                }
+            }
+        });
+
+        window.clearImage = () => {
+            currentPastedImageBase64 = null;
+            document.getElementById('imagePreview').src = '';
+            document.getElementById('imagePreviewContainer').classList.add('hidden');
+            document.getElementById('pastePlaceholder').classList.remove('hidden');
+            document.getElementById('pasteZone').classList.remove('border-indigo-400', 'bg-indigo-50/30');
+        };
+
+        // --- FORM LOGIC ---
+        window.setAddSubject = (subj) => {
+            document.getElementById('qSubject').value = subj;
+            document.getElementById('btnMath').className = subj === 'Math' ? "py-2 text-xs font-bold rounded-lg transition-all bg-white shadow-sm text-indigo-600" : "py-2 text-xs font-bold rounded-lg transition-all text-slate-500 hover:text-slate-700 hover:bg-slate-200/50";
+            document.getElementById('btnReading').className = subj === 'Reading' ? "py-2 text-xs font-bold rounded-lg transition-all bg-white shadow-sm text-indigo-600" : "py-2 text-xs font-bold rounded-lg transition-all text-slate-500 hover:text-slate-700 hover:bg-slate-200/50";
+            updateTypeDropdown(subj);
+        }
+
+        updateTypeDropdown('Math');
+
+        document.getElementById('addBtn').addEventListener('click', async () => {
+            if (!currentUser) return;
+            
+            const btn = document.getElementById('addBtn');
+            const id = document.getElementById('qId').value;
+            const answer = document.getElementById('qAnswer').value;
+            const subject = document.getElementById('qSubject').value;
+            const source = document.getElementById('qSource').value;
+            const problemType = document.getElementById('qType').value;
+            const mistakeReason = document.getElementById('qMistake').value;
+            
+            if(!id || !answer || !currentPastedImageBase64) {
+                alert("Please provide an ID, Answer, and Paste a Screenshot.");
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...`;
+
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'users', currentUser.uid, 'sat_study_tracker_v2'), {
+                    id, 
+                    answer, 
+                    subject, 
+                    source,
+                    problemType,
+                    mistakeReason,
+                    imageBase64: currentPastedImageBase64,
+                    attempts: "1st Time Wrong", 
+                    createdAt: serverTimestamp()
+                });
+                
+                document.getElementById('qId').value = ''; 
+                document.getElementById('qAnswer').value = '';
+                document.getElementById('qSource').value = '';
+                document.getElementById('qType').value = '';
+                document.getElementById('qMistake').value = '';
+                clearImage();
+                showToast("Problem added to queue!");
+            } catch (err) {
+                console.error("Error saving:", err);
+                alert("Error saving document. Image might be too large.");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `Add to Study Queue`;
+            }
+        });
+
+        // --- STUDY MODAL LOGIC ---
+        window.openReview = (id) => {
+            const q = allQuestions.find(i => i._id === id);
+            currentReviewId = id;
+            
+            const subjEl = document.getElementById('modalSubject');
+            if(subjEl) subjEl.innerText = q.subject || 'N/A';
+            
+            const idEl = document.getElementById('modalId');
+            if(idEl) idEl.innerText = q.id || 'N/A';
+            
+            const sourceEl = document.getElementById('modalSource');
+            if(sourceEl) {
+                sourceEl.innerText = q.source || "No Source";
+                sourceEl.parentElement.style.display = q.source ? 'flex' : 'none';
+            }
+
+            const typeEl = document.getElementById('modalType');
+            if(typeEl) {
+                typeEl.innerText = q.problemType || "No Type";
+                typeEl.parentElement.style.display = q.problemType ? 'flex' : 'none';
+            }
+            
+            const imgEl = document.getElementById('modalImage');
+            if(imgEl) imgEl.src = q.imageBase64 || '';
+            
+            const ansEl = document.getElementById('modalAnswer');
+            if(ansEl) ansEl.innerText = q.answer || '';
+            
+            const mContent = document.getElementById('mistakeContent');
+            if(mContent) {
+                if (q.mistakeReason && q.mistakeReason.trim() !== '') {
+                    mContent.innerText = q.mistakeReason;
+                    mContent.parentElement.style.display = 'block';
+                } else {
+                    mContent.innerText = "No mistake reasoning provided.";
+                    mContent.parentElement.style.display = 'none'; 
+                }
+            }
+
+            const coverEl = document.getElementById('answerCover');
+            const revealEl = document.getElementById('answerReveal');
+            const iconEl = document.getElementById('mistakeIcon');
+            
+            if(coverEl) coverEl.classList.remove('hidden');
+            if(revealEl) revealEl.classList.add('hidden');
+            if(mContent) mContent.classList.add('hidden'); 
+            if(iconEl) iconEl.classList.remove('rotate-180');
+            
+            const modalEl = document.getElementById('studyModal');
+            if(modalEl) modalEl.classList.remove('hidden');
+        }
+
+        window.closeModal = () => document.getElementById('studyModal').classList.add('hidden');
+        
+        window.revealAnswer = () => { 
+            document.getElementById('answerCover').classList.add('hidden'); 
+            document.getElementById('answerReveal').classList.remove('hidden'); 
+        }
+
+        window.toggleMistake = () => {
+            const content = document.getElementById('mistakeContent');
+            const icon = document.getElementById('mistakeIcon');
+            if (content.classList.contains('hidden')) {
+                content.classList.remove('hidden');
+                icon.classList.add('rotate-180');
+            } else {
+                content.classList.add('hidden');
+                icon.classList.remove('rotate-180');
+            }
+        }
+
+        window.markMastered = async () => {
+            await updateDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'sat_study_tracker_v2', currentReviewId), { attempts: "Mastered" });
+            closeModal();
+            showToast("Moved to Mastered!");
+        }
+
+        window.markIncorrectAgain = async () => {
+            const q = allQuestions.find(i => i._id === currentReviewId);
+            const next = getPhaseLevel(q.attempts) + 1;
+            await updateDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'sat_study_tracker_v2', currentReviewId), { attempts: `${next}${next === 2 ? 'nd' : 'rd'} Time Wrong` });
+            closeModal();
+            showToast("Moved to next phase.");
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            t.classList.remove('translate-y-32', 'opacity-0');
+            setTimeout(() => t.classList.add('translate-y-32', 'opacity-0'), 2500);
+        }
+    </script>
+</body>
+</html>
