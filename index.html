@@ -39,7 +39,7 @@
             </div>
             <div class="flex gap-3 items-center">
                  <div id="connectionStatus" class="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1 bg-white px-3 py-1 rounded-full border border-slate-200 h-8 mt-1 shadow-sm">
-                    <span class="w-2 h-2 rounded-full bg-slate-300"></span> Connecting...
+                    <span class="w-2 h-2 rounded-full bg-slate-300 animate-pulse"></span> Connecting...
                 </div>
             </div>
         </header>
@@ -349,8 +349,9 @@
         import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // Your web app's Firebase configuration
         const firebaseConfig = {
-            apiKey: "AIzaSyDG_y795DXuvHmqqAg09TxUkYPhHewqa1c",
+            apiKey: "AIzaSyDG_y795DXuvHmqqAgO9TxUkYPhHewqa1c", 
             authDomain: "sat-mistake-tracker-elu.firebaseapp.com",
             projectId: "sat-mistake-tracker-elu",
             storageBucket: "sat-mistake-tracker-elu.firebasestorage.app",
@@ -406,16 +407,21 @@
             console.error("Auth error:", error);
             const statusEl = document.getElementById('connectionStatus');
             
-            if (window.location.protocol === 'file:') {
+            if (error.code === 'auth/api-key-not-valid') {
+                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-red-500"></span> Invalid API Key`;
+                statusEl.classList.remove('text-slate-400');
+                statusEl.classList.add('text-red-600', 'bg-red-50', 'border-red-100');
+                showToast("Firebase Error: Your API Key has a typo in it. Please copy the exact config from Firebase!");
+            } else if (window.location.protocol === 'file:') {
                 statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-yellow-500"></span> Local Mode`;
                 statusEl.classList.remove('text-slate-400');
                 statusEl.classList.add('text-yellow-600', 'bg-yellow-50', 'border-yellow-100');
                 showToast("Running from computer file. Upload to GitHub to enable cloud saving!");
             } else {
-                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-red-500"></span> Blocked`;
+                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-red-500"></span> Connection Error`;
                 statusEl.classList.remove('text-slate-400');
                 statusEl.classList.add('text-red-600', 'bg-red-50', 'border-red-100');
-                showToast("Firebase connection blocked! Make sure this domain is added to Firebase's 'Authorized Domains'.");
+                showToast("Firebase error: " + error.message);
             }
         });
 
@@ -902,3 +908,13 @@
             closeModal();
             showToast("Moved to next phase.");
         }
+        
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            t.classList.remove('translate-y-32', 'opacity-0');
+            setTimeout(() => t.classList.add('translate-y-32', 'opacity-0'), 2500);
+        }
+    </script>
+</body>
+</html>
